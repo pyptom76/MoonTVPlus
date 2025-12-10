@@ -395,6 +395,8 @@ function PlayPageClient() {
   ]);
 
   // 监听剧集切换，自动加载对应的弹幕
+  const lastLoadedEpisodeIdRef = useRef<number | null>(null);
+
   useEffect(() => {
     // 只有在有弹幕选择且有剧集列表时才自动切换
     if (
@@ -404,6 +406,12 @@ function PlayPageClient() {
     ) {
       const episode = danmakuEpisodesList[currentEpisodeIndex];
       if (episode && episode.episodeId !== currentDanmakuSelection.episodeId) {
+        // 避免重复加载同一集的弹幕
+        if (lastLoadedEpisodeIdRef.current === episode.episodeId) {
+          console.log(`跳过重复加载弹幕: episodeId=${episode.episodeId}`);
+          return;
+        }
+
         // 自动加载新集数的弹幕
         const newSelection: DanmakuSelection = {
           animeId: currentDanmakuSelection.animeId,
@@ -412,6 +420,7 @@ function PlayPageClient() {
           episodeTitle: episode.episodeTitle,
         };
         setCurrentDanmakuSelection(newSelection);
+        lastLoadedEpisodeIdRef.current = episode.episodeId;
         loadDanmaku(episode.episodeId);
         console.log(`自动切换弹幕到第 ${currentEpisodeIndex + 1} 集`);
       }
