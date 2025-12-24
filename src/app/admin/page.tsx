@@ -507,6 +507,7 @@ const UserConfig = ({ config, role, refreshConfig, usersV2, userPage, userTotalP
     enabledApis?: string[];
     tags?: string[];
     created_at?: number;
+    oidcSub?: string;
   }> = !hasOldUserData && usersV2 ? usersV2 : (config?.UserConfig?.Users || []);
 
   // 使用 useMemo 计算全选状态，避免每次渲染都重新计算
