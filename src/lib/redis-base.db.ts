@@ -342,7 +342,8 @@ export abstract class BaseRedisStorage implements IStorage {
     password: string,
     role: 'owner' | 'admin' | 'user' = 'user',
     tags?: string[],
-    oidcSub?: string
+    oidcSub?: string,
+    enabledApis?: string[]
   ): Promise<void> {
     const hashedPassword = await this.hashPassword(password);
     const createdAt = Date.now();
@@ -357,6 +358,10 @@ export abstract class BaseRedisStorage implements IStorage {
 
     if (tags && tags.length > 0) {
       userInfo.tags = JSON.stringify(tags);
+    }
+
+    if (enabledApis && enabledApis.length > 0) {
+      userInfo.enabledApis = JSON.stringify(enabledApis);
     }
 
     if (oidcSub) {
@@ -400,6 +405,7 @@ export abstract class BaseRedisStorage implements IStorage {
     banned: boolean;
     tags?: string[];
     oidcSub?: string;
+    enabledApis?: string[];
     created_at: number;
   } | null> {
     const userInfo = await this.withRetry(() =>
@@ -415,6 +421,7 @@ export abstract class BaseRedisStorage implements IStorage {
       banned: userInfo.banned === 'true',
       tags: userInfo.tags ? JSON.parse(userInfo.tags) : undefined,
       oidcSub: userInfo.oidcSub,
+      enabledApis: userInfo.enabledApis ? JSON.parse(userInfo.enabledApis) : undefined,
       created_at: parseInt(userInfo.created_at || '0', 10),
     };
   }
@@ -427,6 +434,7 @@ export abstract class BaseRedisStorage implements IStorage {
       banned?: boolean;
       tags?: string[];
       oidcSub?: string;
+      enabledApis?: string[];
     }
   ): Promise<void> {
     const userInfo: Record<string, string> = {};
@@ -445,6 +453,15 @@ export abstract class BaseRedisStorage implements IStorage {
       } else {
         // 删除tags字段
         await this.withRetry(() => this.client.hDel(this.userInfoKey(userName), 'tags'));
+      }
+    }
+
+    if (updates.enabledApis !== undefined) {
+      if (updates.enabledApis.length > 0) {
+        userInfo.enabledApis = JSON.stringify(updates.enabledApis);
+      } else {
+        // 删除enabledApis字段
+        await this.withRetry(() => this.client.hDel(this.userInfoKey(userName), 'enabledApis'));
       }
     }
 
@@ -499,6 +516,8 @@ export abstract class BaseRedisStorage implements IStorage {
       role: 'owner' | 'admin' | 'user';
       banned: boolean;
       tags?: string[];
+      oidcSub?: string;
+      enabledApis?: string[];
       created_at: number;
     }>;
     total: number;
