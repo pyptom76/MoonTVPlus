@@ -190,6 +190,7 @@ export async function GET(request: NextRequest) {
       }
 
       const jsonData = JSON.parse(match[1] + '}');
+      const gameLiveInfo = jsonData.data?.[0]?.gameLiveInfo;
       const streamInfo = jsonData.data?.[0]?.gameStreamInfoList?.[0];
 
       if (!streamInfo) {
@@ -203,7 +204,9 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         url: proxyUrl,
-        originalUrl: streamUrl
+        originalUrl: streamUrl,
+        name: gameLiveInfo?.nick || '',
+        title: gameLiveInfo?.introduction || ''
       });
     }
 

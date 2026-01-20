@@ -19,6 +19,7 @@ export default function WebLivePage() {
   const [currentSource, setCurrentSource] = useState<any | null>(null);
   const [videoUrl, setVideoUrl] = useState('');
   const [originalVideoUrl, setOriginalVideoUrl] = useState('');
+  const [streamInfo, setStreamInfo] = useState<{ name?: string; title?: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'rooms' | 'platforms'>('rooms');
   const [isChannelListCollapsed, setIsChannelListCollapsed] = useState(false);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
@@ -81,15 +82,59 @@ export default function WebLivePage() {
       setVideoUrl('');
     });
     flvPlayer.load();
-    (video as any).flvPlayer = flvPlayer;
+    (video as any).flv = flvPlayer;
   }
+
+  // 清理播放器资源的统一函数
+  const cleanupPlayer = () => {
+    if (artPlayerRef.current) {
+      try {
+        // 先暂停播放
+        if (artPlayerRef.current.video) {
+          artPlayerRef.current.video.pause();
+          artPlayerRef.current.video.src = '';
+          artPlayerRef.current.video.load();
+        }
+
+        // 销毁 HLS 实例
+        if (artPlayerRef.current.video && artPlayerRef.current.video.hls) {
+          artPlayerRef.current.video.hls.destroy();
+          artPlayerRef.current.video.hls = null;
+        }
+
+        // 销毁 FLV 实例
+        if (artPlayerRef.current.video && (artPlayerRef.current.video as any).flv) {
+          try {
+            if ((artPlayerRef.current.video as any).flv.unload) {
+              (artPlayerRef.current.video as any).flv.unload();
+            }
+            (artPlayerRef.current.video as any).flv.destroy();
+            (artPlayerRef.current.video as any).flv = null;
+          } catch (flvError) {
+            console.warn('FLV实例销毁时出错:', flvError);
+            (artPlayerRef.current.video as any).flv = null;
+          }
+        }
+
+        // 移除所有事件监听器
+        artPlayerRef.current.off('ready');
+        artPlayerRef.current.off('error');
+
+        // 销毁 ArtPlayer 实例
+        artPlayerRef.current.destroy();
+        artPlayerRef.current = null;
+      } catch (err) {
+        console.warn('清理播放器资源时出错:', err);
+        artPlayerRef.current = null;
+      }
+    }
+  };
 
   useEffect(() => {
     if (!Artplayer || !Hls || !flvjs || !videoUrl || !artRef.current) return;
 
-    if (artPlayerRef.current) {
-      artPlayerRef.current.destroy();
-    }
+    // 销毁旧的播放器实例
+    cleanupPlayer();
 
     artPlayerRef.current = new Artplayer({
       container: artRef.current,
@@ -105,23 +150,52 @@ export default function WebLivePage() {
     });
 
     return () => {
-      if (artPlayerRef.current) {
-        artPlayerRef.current.destroy();
-        artPlayerRef.current = null;
-      }
+      cleanupPlayer();
     };
   }, [videoUrl]);
 
+  // 组件卸载时清理
+  useEffect(() => {
+    return () => {
+      cleanupPlayer();
+    };
+  }, []);
+
+  // 页面卸载前清理
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      cleanupPlayer();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      cleanupPlayer();
+    };
+  }, []);
+
   const handleSourceClick = async (source: any) => {
+    // 立即清理旧的播放器
+    cleanupPlayer();
+
     setCurrentSource(source);
     setIsVideoLoading(true);
     setErrorMessage(null);
+    setStreamInfo(null);
     try {
       const res = await fetch(`/api/web-live/stream?platform=${source.platform}&roomId=${source.roomId}`);
       if (res.ok) {
         const data = await res.json();
         setVideoUrl(data.url);
         setOriginalVideoUrl(data.originalUrl || data.url);
+        // 保存主播信息
+        if (data.name || data.title) {
+          setStreamInfo({
+            name: data.name,
+            title: data.title
+          });
+        }
       } else {
         const data = await res.json();
         setErrorMessage(data.error || '获取直播流失败');
@@ -476,6 +550,24 @@ export default function WebLivePage() {
                         </span>
                       </button>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 直播信息显示 */}
+              {streamInfo && (streamInfo.name || streamInfo.title) && (
+                <div className='mt-3 px-2'>
+                  <div className='space-y-1.5'>
+                    {streamInfo.title && (
+                      <div className='text-lg font-medium text-black dark:text-white line-clamp-2'>
+                        {streamInfo.title}
+                      </div>
+                    )}
+                    {streamInfo.name && (
+                      <div className='text-base text-black dark:text-white'>
+                        {streamInfo.name}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
